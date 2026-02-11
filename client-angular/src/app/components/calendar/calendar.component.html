@@ -1,0 +1,42 @@
+<div class="calendar-container container">
+  <div class="calendar-header">
+    <div class="date-navigation">
+      <button class="btn btn-secondary" (click)="previousDay()">&larr; Previous</button>
+      <button class="btn btn-secondary" (click)="goToToday()">Today</button>
+      <button class="btn btn-secondary" (click)="nextDay()">Next &rarr;</button>
+    </div>
+    <h2 class="current-date">{{ formatDisplayDate(selectedDate) }}</h2>
+  </div>
+
+  <div *ngIf="loading" class="loading">Loading events...</div>
+  
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <div *ngIf="!loading && !error" class="calendar-grid">
+    <div class="time-column">
+      <div class="hour-label" *ngFor="let hour of hours">
+        {{ formatHour(hour) }}
+      </div>
+    </div>
+    
+    <div class="events-column">
+      <div class="hour-row" *ngFor="let hour of hours"></div>
+      
+      <div
+        class="event-block"
+        *ngFor="let event of events"
+        [style.top]="getEventPosition(event).top"
+        [style.height]="getEventPosition(event).height"
+        (click)="onEventClick(event)"
+      >
+        <div class="event-title">{{ event.title }}</div>
+        <div class="event-time">{{ formatEventTime(event) }} ({{ event.duration }} min)</div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && !error && events.length === 0" class="no-events">
+    No events scheduled for this day.
+  </div>
+</div>
+

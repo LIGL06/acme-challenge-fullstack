@@ -1,0 +1,78 @@
+# Java / Maven / Spring Boot
+server-java/target/
+server-java/.mvn/
+server-java/mvnw
+server-java/mvnw.cmd
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.ctxt
+.mtj.tmp/
+hs_err_pid*
+replay_pid*
+
+# Angular / Node.js
+client-angular/node_modules/
+client-angular/dist/
+client-angular/.angular/
+client-angular/tmp/
+client-angular/out-tsc/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.metadata/
+.recommenders/
+nbproject/
+.nb-gradle/
+
+# Docker
+.dockerignore
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Build artifacts
+build/
+dist/
+out/
+
+internal/
