@@ -71,10 +71,14 @@
   position: absolute;
   left: 4px;
   right: 4px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   background: #3b82f6;
   color: white;
   border-radius: 0.25rem;
-  padding: 0.5rem;
+  padding: 0 0.5rem;
   cursor: pointer;
   overflow: hidden;
   transition: background-color 0.2s;
@@ -98,31 +102,31 @@
 }
 
 .event-title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .event-time {
+  flex: 0 0 auto;
   font-size: 0.75rem;
   opacity: 0.9;
-}
-
-.event-availability {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .occupancy {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
   opacity: 0.9;
+  white-space: nowrap;
 }
 
 .availability-badge {
+  flex: 0 0 auto;
   display: inline-block;
   padding: 0.0625rem 0.4rem;
   border-radius: 999px;
@@ -130,6 +134,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 
   &.badge-available {
     background: #16a34a;

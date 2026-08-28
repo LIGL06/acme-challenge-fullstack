@@ -30,14 +30,11 @@
         [style.height]="getEventPosition(event).height"
         (click)="onEventClick(event)"
       >
-        <div class="event-title">{{ event.title }}</div>
-        <div class="event-time">{{ formatEventTime(event) }} ({{ event.duration }} min)</div>
-        <div class="event-availability">
-          <span class="availability-badge" [ngClass]="'badge-' + event.availabilityStatus.toLowerCase()">
-            {{ availabilityLabel(event) }}
-          </span>
-          <span class="occupancy">{{ event.currentBookings }} / {{ event.capacity }} booked</span>
-        </div>
+        <span class="event-title" [title]="event.title">{{ event.title }}</span>
+        <span class="availability-badge" [ngClass]="'badge-' + event.availabilityStatus.toLowerCase()">
+          {{ availabilityLabel(event) }}
+        </span>
+        <span class="occupancy">{{ event.currentBookings }}/{{ event.capacity }} booked</span>
       </div>
     </div>
   </div>
