@@ -109,7 +109,7 @@ export class CalendarComponent implements OnInit {
   }
 
   onEventClick(event: Event): void {
-    this.router.navigate(['/events', event.id, 'book'], {
+    this.router.navigate(['/events', event.id, 'manage'], {
       queryParams: { date: this.formatDate(this.selectedDate) }
     });
   }

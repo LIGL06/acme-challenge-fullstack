@@ -32,6 +32,7 @@ Difficulty read, easiest/most-foundational → hardest
     2. Dont touch DB, Assume test and compilation will pass, then run/reseeed manually.
     - *EDIT*: I've chosen Drop & reseed, since is new data needed.
 - Added DEFAULT_CAPACITY and DEFAULT_PRICE to DataSeeder, as well with some bookings to test those limited/waitlist scenarios.
+- Changed the alignment on the calendar row, since it was horizontal overflowing, now it's a single line, giving better readability, _pending confirmation on intended alignment._
 
 
 ## Phase 1 implementation: data model, capacity-aware booking creation, calendar indicator
@@ -194,6 +195,54 @@ The PRD's cancel-action language is scoped to confirmed bookings ("Each confirme
 - `promoteWaitlist` re-queries `sumParticipantsByEventIdAndStatus` right after the cancelling save rather than computing the freed count arithmetically from the cancelled booking's own `participantCount`. Slightly more DB work (one extra `SUM` query) but immune to drift if this method is ever called from a path where the "before" state isn't precisely known — correctness over a micro-optimization here.
 - No optimistic locking / row-level locking on the event or its bookings — two concurrent cancellations for the same event could theoretically both read the same `freeSlots` before either promotion commits, momentarily over-promoting. Not addressed here since the rest of the app has no concurrency control anywhere else either (e.g. `createBooking` has the same race between the occupancy check and the save); consistent with existing scope, but worth flagging if this ever needs to be production-hardened.
 - Still backend-only: no cancel button exists in the UI yet. That's the booking management view (next phase), which is exactly where this endpoint gets its first real caller.
+
+---
+
+## Phase 6: Booking management view
+
+Used the same workflow pattern as Phase 4 (single implement pass, then adversarial multi-lens review), but skipped a design-panel step this time — see the navigation decision below, which the PRD already settles explicitly rather than leaving as a judgment call.
+
+### Decision: the calendar's event click now opens the management view, not the booking form
+
+The PRD's own wording creates an apparent conflict with Phase 4: section 3 ("Booking Management View") says "Clicking on an event in the calendar opens (or navigates to) a booking management view for that event," while Phase 4 wired the same click to the booking-creation form. Resolved by re-pointing the primary click at the management view (since the PRD is explicit and unambiguous here, this wasn't treated as a design choice worth running a proposal panel over) and keeping the booking form fully reachable one level down:
+
+- Calendar (`/`) → click event → `/events/:id/manage` (this phase)
+- Management view → "+ New Booking" → `/events/:id/book` (Phase 4's form, untouched business logic)
+- Booking form → submit or Cancel → back to `/events/:id/manage` (previously went straight back to `/`)
+- Booking form's `loadError` case (event 404/failed to load) → still falls back to `/`, since there's no valid event to manage in that case — this is the one place `backToCalendar()` was kept as-is
+- Management view → "Back to calendar" → `/`
+
+The `?date=` query-param round-trip Phase 4 already built is threaded through every one of these hops so the operator's selected day survives the whole detour.
+
+**Pros:** matches the PRD's literal acceptance criterion; the booking form's create-a-new-booking flow (guest-facing simulation) stays fully intact and just moved one hop deeper, so none of Phase 4's validation/waitlist-messaging logic needed to change.
+**Cons:** one more click to create a booking than before (calendar → manage → book, instead of calendar → book directly). Accepted, since the PRD frames the calendar as an operator tool where seeing current occupancy/bookings first is the more natural default.
+
+### What was built
+- **Backend:** `BookingService.getBookingsByEventId` now returns `List<BookingResponse>` (mapped via the existing `BookingResponse.from`) instead of raw `List<Booking>` entities, matching the DTO-at-the-service-boundary convention already used by `EventService` — this closes the gap flagged as a known limitation at the end of Phase 4. `BookingController`'s matching endpoint signature updated; unused `Booking` import removed. Confirmed via a new test that this endpoint returns bookings of **every** status unfiltered (CONFIRMED + CANCELLED + WAITLISTED together) — filtering into "main table" vs. "waitlist" is the client's job, not the API's.
+- **Frontend:** new standalone `BookingManagementComponent` (`/events/:id/manage`) — fetches the event and its bookings in parallel via `forkJoin`, splits them into a main table (CONFIRMED + CANCELLED, sorted oldest-first, cancelled rows struck-through/dimmed via a `status-cancelled` class) and a waitlist section (WAITLISTED only, oldest-first, numbered #1/#2/...). Each CONFIRMED row gets a Cancel button that calls the existing `POST /api/bookings/{id}/cancel`. `EventService` gained `cancelBooking()` and `getBookingsByEventId` now types its response as `BookingResponse[]` instead of the old raw `Booking` shape (that interface was deleted as dead code once nothing referenced it). `calendar.component.ts`'s `onEventClick` and `booking-form.component.ts`'s exit points were rewired per the decision above.
+
+### Verify findings and how they were resolved
+The 3-lens review (PRD/correctness, Angular/TS quality, UX edge cases) came back clean on PRD compliance, but caught a real bug and a real race condition in the new component, both fixed directly:
+
+| Finding | Severity | Fix |
+|---|---|---|
+| After a successful cancel, `cancelBooking()` reloaded via `loadData(false)`; if *that* reload failed for any reason, its generic error handler set `cancelError = 'Could not cancel this booking...'` — actively lying about an action that had already succeeded, and leaving the row stuck showing stale CONFIRMED/re-enabled-Cancel state | high | `cancelBooking()` now patches the returned `BookingResponse` directly into `mainBookings` the moment the cancel call itself succeeds (so the row is correct regardless of what the background refresh does), and `loadData`'s error branch only sets a page-level error when `showLoading` is true — a background refresh failure is no longer conflated with a cancel failure |
+| Single scalar `cancellingId` meant clicking Cancel on a second row while a first cancel was still in flight would silently clear the first row's "Cancelling…" state (and vice versa on completion) | medium | Replaced with a `cancellingIds: Set<number>`, so each row's in-flight state is tracked independently |
+
+### Assumptions
+- The "table of confirmed bookings" from the PRD's section 3 is read as "table of non-waitlisted bookings" (CONFIRMED + CANCELLED together) rather than literally confirmed-only, since the same section separately requires cancelled and confirmed bookings to be visually distinct from each other in that view — that requirement only makes sense if cancelled bookings are still shown there, not removed from the list once cancelled.
+- Both the main table and the waitlist section sort oldest-first by `createdAt`. The PRD only specifies ordering for the waitlist (explicitly "in order of creation"); applying the same rule to the main table was a simplicity choice, not a requirement — no strong signal either way for that table.
+- No combined "event + bookings" backend endpoint was added; the management view makes two parallel calls (`getEventById`, `getBookingsByEventId`) via `forkJoin`, consistent with how the rest of the app already composes existing endpoints rather than growing new aggregate ones on demand.
+
+### Trade-offs / known limitations
+- Same lack-of-concurrency-control caveat as Phase 5: no optimistic locking, so two operators cancelling different bookings for the same event at nearly the same moment could race on the promotion math. Not addressed here, consistent with the rest of the app.
+- No interactive browser testing was possible in this sandboxed environment — validated via `mvn test`, `ng build`, and the adversarial review, not by clicking through it. Worth a manual pass, especially the full click-through chain (calendar → manage → book → manage → calendar) and the cancel-then-promotion visual update.
+- The booking form's create flow is now one hop further from the calendar than in Phase 4; if user feedback says this is annoying for operators who mostly just want to add a walk-in booking, a quick "+" affordance directly on the calendar tile (bypassing the management view) would be a small, additive follow-up — not built now since it's speculative.
+
+### How it was tested
+- `mvn test`: 12/12 pass (4 `EventServiceTest` + 8 `BookingServiceTest`, including 2 new tests added this phase for the DTO-mapping change).
+- `ng build --configuration development`: compiles cleanly, 0 errors/0 warnings.
+- `git status --short` confirmed the diff was exactly the files this phase was expected to touch — `calendar.component.html`/`.scss` untouched, `DataSeeder` untouched.
 
 ### How it was tested
 - `mvn test`: 10/10 pass (4 pre-existing `EventServiceTest` + 6 new `BookingServiceTest`), run against the H2 in-memory test profile.

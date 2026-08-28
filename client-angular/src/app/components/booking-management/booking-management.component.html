@@ -1,0 +1,92 @@
+<div class="card booking-management-card">
+  <div *ngIf="loadingEvent">Loading event…</div>
+
+  <ng-container *ngIf="loadError">
+    <div class="error">{{ loadError }}</div>
+    <button class="btn btn-secondary" (click)="backToCalendar()">Back to calendar</button>
+  </ng-container>
+
+  <ng-container *ngIf="event && !loadingEvent">
+    <div class="event-summary">
+      <h2>{{ event.title }}</h2>
+      <p class="event-datetime">
+        {{ event.start | date:'EEEE, MMMM d, y' }} at {{ event.start | date:'shortTime' }} ({{ event.duration }} min)
+      </p>
+      <p class="event-availability">
+        <span class="availability-badge" [ngClass]="'badge-' + event.availabilityStatus.toLowerCase()">
+          {{ event.availabilityStatus === 'FULL' ? 'Full' : event.availabilityStatus === 'LIMITED' ? 'Limited' : 'Available' }}
+        </span>
+        <span>{{ event.currentBookings }} / {{ event.capacity }} booked ({{ event.availableSeats }} seat{{ event.availableSeats === 1 ? '' : 's' }} available)</span>
+      </p>
+    </div>
+
+    <div class="management-actions">
+      <button class="btn btn-primary" (click)="goToNewBooking()">+ New Booking</button>
+      <button class="btn btn-secondary" (click)="backToCalendar()">Back to calendar</button>
+    </div>
+
+    <div class="alert-error" *ngIf="cancelError">{{ cancelError }}</div>
+
+    <div class="bookings-section">
+      <h3>Bookings</h3>
+      <table class="bookings-table" *ngIf="mainBookings.length > 0">
+        <thead>
+          <tr>
+            <th>Guest</th>
+            <th>Email</th>
+            <th>Participants</th>
+            <th>Status</th>
+            <th>Booked On</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let booking of mainBookings" [ngClass]="{ 'status-cancelled': booking.status === 'CANCELLED' }">
+            <td>{{ booking.firstName }} {{ booking.lastName }}</td>
+            <td>{{ booking.customerEmail }}</td>
+            <td>{{ booking.participantCount }}</td>
+            <td>{{ booking.status === 'CONFIRMED' ? 'Confirmed' : 'Cancelled' }}</td>
+            <td>{{ booking.createdAt | date:'short' }}</td>
+            <td>
+              <button
+                *ngIf="booking.status === 'CONFIRMED'"
+                class="btn btn-secondary btn-sm"
+                type="button"
+                [disabled]="cancellingIds.has(booking.id)"
+                (click)="cancelBooking(booking)"
+              >
+                {{ cancellingIds.has(booking.id) ? 'Cancelling…' : 'Cancel' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p *ngIf="mainBookings.length === 0" class="empty-state">No bookings yet.</p>
+    </div>
+
+    <div class="waitlist-section">
+      <h3>Waitlist</h3>
+      <table class="bookings-table" *ngIf="waitlistBookings.length > 0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Guest</th>
+            <th>Email</th>
+            <th>Participants</th>
+            <th>Booked On</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let booking of waitlistBookings; let i = index">
+            <td>#{{ i + 1 }}</td>
+            <td>{{ booking.firstName }} {{ booking.lastName }}</td>
+            <td>{{ booking.customerEmail }}</td>
+            <td>{{ booking.participantCount }}</td>
+            <td>{{ booking.createdAt | date:'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p *ngIf="waitlistBookings.length === 0" class="empty-state">No one is currently waitlisted.</p>
+    </div>
+  </ng-container>
+</div>

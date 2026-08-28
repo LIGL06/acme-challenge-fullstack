@@ -126,7 +126,14 @@ export class BookingFormComponent implements OnInit {
     this.router.navigate(['/'], this.returnDate ? { queryParams: { date: this.returnDate } } : {});
   }
 
+  backToManagement(): void {
+    if (!this.event) {
+      return;
+    }
+    this.router.navigate(['/events', this.event.id, 'manage'], this.returnDate ? { queryParams: { date: this.returnDate } } : {});
+  }
+
   cancel(): void {
-    this.backToCalendar();
+    this.backToManagement();
   }
 }

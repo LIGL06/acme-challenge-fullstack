@@ -1,5 +1,6 @@
 package com.peek.challenge;
 
+import com.peek.challenge.dto.BookingResponse;
 import com.peek.challenge.dto.CreateBookingRequest;
 import com.peek.challenge.model.Booking;
 import com.peek.challenge.model.BookingStatus;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -125,5 +127,33 @@ class BookingServiceTest {
 
         assertThat(oversizedResult.getStatus()).isEqualTo(BookingStatus.WAITLISTED);
         assertThat(smallerResult.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    void getBookingsByEventIdReturnsProperlyMappedBookingResponse() {
+        Booking booking = confirmedBooking(4);
+
+        List<BookingResponse> responses = bookingService.getBookingsByEventId(event.getId());
+
+        assertThat(responses).hasSize(1);
+        BookingResponse response = responses.get(0);
+        assertThat(response.id()).isEqualTo(booking.getId());
+        assertThat(response.status()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(response.message()).isEqualTo("Booking confirmed.");
+    }
+
+    @Test
+    void getBookingsByEventIdIncludesBookingsOfEveryStatusWithoutFiltering() {
+        Booking confirmed = confirmedBooking(8);
+        Booking toCancel = confirmedBooking(2); // fills capacity (10/10)
+        Booking waitlisted = waitlistedBooking(5); // exceeds capacity while confirmed holds 10
+        bookingService.cancelBooking(toCancel.getId()); // frees only 2 slots, not enough to promote
+
+        List<BookingResponse> responses = bookingService.getBookingsByEventId(event.getId());
+
+        assertThat(responses).extracting(BookingResponse::id)
+                .containsExactlyInAnyOrder(confirmed.getId(), toCancel.getId(), waitlisted.getId());
+        assertThat(responses).extracting(BookingResponse::status)
+                .containsExactlyInAnyOrder(BookingStatus.CONFIRMED, BookingStatus.CANCELLED, BookingStatus.WAITLISTED);
     }
 }

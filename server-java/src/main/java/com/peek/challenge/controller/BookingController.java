@@ -2,7 +2,6 @@ package com.peek.challenge.controller;
 
 import com.peek.challenge.dto.BookingResponse;
 import com.peek.challenge.dto.CreateBookingRequest;
-import com.peek.challenge.model.Booking;
 import com.peek.challenge.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,7 @@ public class BookingController {
     private final BookingService bookingService;
 
     @GetMapping("/event/{eventId}")
-    public ResponseEntity<List<Booking>> getBookingsByEventId(@PathVariable Long eventId) {
+    public ResponseEntity<List<BookingResponse>> getBookingsByEventId(@PathVariable Long eventId) {
         return ResponseEntity.ok(bookingService.getBookingsByEventId(eventId));
     }
 

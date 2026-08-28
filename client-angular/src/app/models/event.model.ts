@@ -16,19 +16,6 @@ export interface Event {
 
 export type BookingStatus = 'CONFIRMED' | 'CANCELLED' | 'WAITLISTED';
 
-export interface Booking {
-  id: number;
-  firstName: string;
-  lastName: string;
-  eventId: number;
-  customerEmail: string;
-  participantCount: number;
-  notes?: string;
-  status: BookingStatus;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export interface CreateBookingRequest {
   eventId: number;
   firstName: string;

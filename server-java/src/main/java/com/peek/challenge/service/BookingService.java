@@ -1,5 +1,6 @@
 package com.peek.challenge.service;
 
+import com.peek.challenge.dto.BookingResponse;
 import com.peek.challenge.dto.CreateBookingRequest;
 import com.peek.challenge.model.Booking;
 import com.peek.challenge.model.BookingStatus;
@@ -21,8 +22,10 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final EventRepository eventRepository;
 
-    public List<Booking> getBookingsByEventId(Long eventId) {
-        return bookingRepository.findByEventId(eventId);
+    public List<BookingResponse> getBookingsByEventId(Long eventId) {
+        return bookingRepository.findByEventId(eventId).stream()
+                .map(BookingResponse::from)
+                .toList();
     }
 
     public Optional<Booking> getBookingById(Long id) {
