@@ -31,5 +31,12 @@ public class BookingController {
                 .map(booking -> ResponseEntity.status(HttpStatus.CREATED).body(BookingResponse.from(booking)))
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<BookingResponse> cancelBooking(@PathVariable Long id) {
+        return bookingService.cancelBooking(id)
+                .map(booking -> ResponseEntity.ok(BookingResponse.from(booking)))
+                .orElse(ResponseEntity.notFound().build());
+    }
 }
 

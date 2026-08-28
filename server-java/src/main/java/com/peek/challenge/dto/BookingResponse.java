@@ -19,9 +19,11 @@ public record BookingResponse(
 ) {
 
     public static BookingResponse from(Booking booking) {
-        String message = booking.getStatus() == BookingStatus.WAITLISTED
-                ? "This event is full. The booking has been added to the waitlist."
-                : "Booking confirmed.";
+        String message = switch (booking.getStatus()) {
+            case WAITLISTED -> "This event is full. The booking has been added to the waitlist.";
+            case CANCELLED -> "This booking has been cancelled.";
+            case CONFIRMED -> "Booking confirmed.";
+        };
 
         return new BookingResponse(
                 booking.getId(),

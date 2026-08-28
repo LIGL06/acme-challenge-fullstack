@@ -30,6 +30,56 @@ public class BookingService {
     }
 
     /**
+     * Cancels a booking. If it was CONFIRMED, frees its slots and promotes
+     * waitlisted bookings (oldest first) that now fit within the freed
+     * capacity, skipping any that don't fit and trying the next one.
+     * Cancelling an already-cancelled booking is a no-op.
+     *
+     * @return The (now cancelled) booking, or empty if it doesn't exist
+     */
+    @Transactional
+    public Optional<Booking> cancelBooking(Long id) {
+        return getBookingById(id).map(booking -> {
+            if (booking.getStatus() == BookingStatus.CANCELLED) {
+                return booking;
+            }
+
+            boolean wasConfirmed = booking.getStatus() == BookingStatus.CONFIRMED;
+            booking.setStatus(BookingStatus.CANCELLED);
+            Booking cancelled = bookingRepository.save(booking);
+
+            if (wasConfirmed) {
+                promoteWaitlist(cancelled.getEvent());
+            }
+
+            return cancelled;
+        });
+    }
+
+    private void promoteWaitlist(Event event) {
+        int confirmedParticipants = bookingRepository
+                .sumParticipantsByEventIdAndStatus(event.getId(), BookingStatus.CONFIRMED);
+        int freeSlots = event.getCapacity() - confirmedParticipants;
+        if (freeSlots <= 0) {
+            return;
+        }
+
+        List<Booking> waitlisted = bookingRepository
+                .findByEventIdAndStatusOrderByCreatedAtAsc(event.getId(), BookingStatus.WAITLISTED);
+
+        for (Booking candidate : waitlisted) {
+            if (freeSlots <= 0) {
+                break;
+            }
+            if (candidate.getParticipantCount() <= freeSlots) {
+                candidate.setStatus(BookingStatus.CONFIRMED);
+                bookingRepository.save(candidate);
+                freeSlots -= candidate.getParticipantCount();
+            }
+        }
+    }
+
+    /**
      * Creates a booking for the given event. Confirms it if enough capacity
      * remains, otherwise places it on the waitlist.
      *
@@ -54,16 +104,6 @@ public class BookingService {
                             .build();
                     return bookingRepository.save(booking);
                 });
-    }
-
-    @Transactional
-    public boolean deleteBooking(Long id) {
-        return bookingRepository.findById(id)
-                .map(booking -> {
-                    bookingRepository.delete(booking);
-                    return true;
-                })
-                .orElse(false);
     }
 }
 

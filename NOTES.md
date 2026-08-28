@@ -147,3 +147,54 @@ All 8 findings from the 3-lens review were low/medium severity, non-structural (
 - `ng build`: compiles cleanly, zero errors/warnings, after all fixes were applied.
 - Verified both `http://localhost:4200/` and `http://localhost:4200/events/13/book` serve correctly via curl, and that `GET /api/events/13` still reflects live occupancy — confirms the client/server wiring is intact end-to-end.
 - As in Phase 1, no real browser/click-through testing was possible (no display in this sandbox) — this is the main gap to close with a manual pass.
+
+---
+
+## Between phases: calendar row-alignment fix
+
+The user reported the event block's label (availability badge) and booking counter were unreadable — root cause: `getEventPosition()` sets block height directly to `event.duration` in minutes-as-pixels (60px for a 60-min event), while the content was stacked 3 lines deep (title / time / badge+count) inside `padding: 0.5rem`. That left too little vertical room, so the bottom line was clipped by the block's `overflow: hidden`.
+
+Fixed by collapsing the block to a single flex row (title, badge, booked count), with `min-height: 28px` so short-duration events can't collapse below one readable line, and `flex: 1 1 auto` + ellipsis on the title so it truncates instead of pushing the fixed-width badge/count off-screen. The user then committed their own refinement on top (`2d206dd`) that also dropped the separate time label from the row for a tighter layout — that commit is authoritative; the only follow-up needed was removing the now-orphaned `.event-time` SCSS rule and `formatEventTime()` method (`f1aaf5c`).
+
+---
+
+## Phase 5: Cancel + waitlist promotion (backend)
+
+### What was built
+- `BookingRepository.findByEventIdAndStatusOrderByCreatedAtAsc(eventId, status)` — used to fetch waitlisted bookings oldest-first for promotion.
+- `BookingService.cancelBooking(id)` — looks up the booking; if already `CANCELLED`, returns it unchanged (idempotent no-op); otherwise sets it to `CANCELLED` and, only if it was previously `CONFIRMED`, runs `promoteWaitlist(event)`.
+- `promoteWaitlist(event)` — recomputes `freeSlots = capacity - confirmedParticipants` after the cancellation, then walks the waitlist oldest-first: promotes any candidate whose `participantCount <= freeSlots` (deducting from `freeSlots` as it goes), and **skips** (does not stop on) any candidate that doesn't fit, per the PRD's explicit rule ("skip and try next").
+- `POST /api/bookings/{id}/cancel` — returns the updated `BookingResponse` (200) or 404 if the booking doesn't exist.
+- Fixed a latent bug in `BookingResponse.from()`: the `message` field only ever distinguished `WAITLISTED` from "everything else," so a cancelled booking would have been reported as "Booking confirmed." Replaced the ternary with an exhaustive `switch` over `BookingStatus` now that `CANCELLED` is a real reachable state through this endpoint.
+- Removed the dead `BookingService.deleteBooking()` (hard delete) — it was never wired to any controller route, and cancel (soft delete via status) is the actual operation the PRD calls for.
+- 6 new tests in `BookingServiceTest` covering: cancel-unknown-id → empty, cancel-confirmed-with-no-waitlist, cancel-already-cancelled (idempotent), cancel-a-waitlisted-booking (must NOT trigger promotion, since it wasn't occupying confirmed capacity), promote-the-one-that-fits, and skip-oversized-then-promote-the-next-one-that-fits.
+
+### Decision: cancelling an already-cancelled booking is a no-op, not an error
+
+**Pros:**
+- No new exception type or global `@ControllerAdvice` needed — this codebase has neither today, and every other service method already communicates "not found" via `Optional`. A no-op keeps that same shape (still `Optional<Booking>`, still 404 only for a genuinely missing id).
+- Idempotent by construction: a client that retries a cancel request (double-click, network retry) lands on the same terminal state either way, which is the behavior you generally want for a cancel/DELETE-like action.
+
+**Cons / accepted trade-off:**
+- A client can't distinguish "I just cancelled it" from "it was already cancelled" from the response alone (both return 200 with `status: CANCELLED`). Considered returning 409 Conflict instead, but that would require introducing a custom exception + handler for a single edge case with no PRD requirement either way — not worth the extra machinery for this scope. Revisit if the booking management view (next phase) needs to show a specific "already cancelled" toast.
+
+### Decision: cancelling a WAITLISTED booking is allowed, but never triggers promotion
+
+The PRD's cancel-action language is scoped to confirmed bookings ("Each confirmed booking has a **Cancel** action"), but the backend endpoint accepts cancelling any non-cancelled booking. Reasoning: a waitlisted guest changing their mind is a real scenario, and without this, a `WAITLISTED` booking would be a stuck terminal-adjacent state with no way out except promotion. Cancelling one correctly triggers **no** promotion check, since it was never occupying confirmed capacity — freeing zero slots — which is exactly what the `wasConfirmed` guard in `cancelBooking` enforces and what the corresponding test asserts.
+
+### Complexity
+- `cancelBooking`: O(1) for the status flip; `promoteWaitlist` is O(w) where w = number of currently-waitlisted bookings for that event, since it may need to walk the full list to find enough right-sized candidates to exhaust the freed slots (or reach the end). No N+1 queries — one `SUM` query for occupancy, one indexed lookup for the waitlist, then in-memory iteration.
+
+### Assumptions
+- Unlimited waitlist size (per the PRD's own stated assumption) — no cap enforced anywhere.
+- Partially-fitting waitlist entries are skipped, not split or partially promoted — matches the PRD's stated assumption exactly.
+- No separate "waitlist position" column: ordering is derived from `createdAt` at read time (this was already the plan noted in Phase 1-3, now put to use).
+
+### Trade-offs / known limitations
+- `promoteWaitlist` re-queries `sumParticipantsByEventIdAndStatus` right after the cancelling save rather than computing the freed count arithmetically from the cancelled booking's own `participantCount`. Slightly more DB work (one extra `SUM` query) but immune to drift if this method is ever called from a path where the "before" state isn't precisely known — correctness over a micro-optimization here.
+- No optimistic locking / row-level locking on the event or its bookings — two concurrent cancellations for the same event could theoretically both read the same `freeSlots` before either promotion commits, momentarily over-promoting. Not addressed here since the rest of the app has no concurrency control anywhere else either (e.g. `createBooking` has the same race between the occupancy check and the save); consistent with existing scope, but worth flagging if this ever needs to be production-hardened.
+- Still backend-only: no cancel button exists in the UI yet. That's the booking management view (next phase), which is exactly where this endpoint gets its first real caller.
+
+### How it was tested
+- `mvn test`: 10/10 pass (4 pre-existing `EventServiceTest` + 6 new `BookingServiceTest`), run against the H2 in-memory test profile.
+- Frontend untouched this phase — confirmed via `git status` showing only `server-java` files changed.
