@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Event, CreateBookingRequest, BookingResponse } from '../models/event.model';
+import { Event, CreateBookingRequest, BookingResponse, DashboardResponse } from '../models/event.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -34,6 +34,10 @@ export class EventService {
 
   cancelBooking(id: number): Observable<BookingResponse> {
     return this.http.post<BookingResponse>(`${this.apiUrl}/bookings/${id}/cancel`, {});
+  }
+
+  getDashboard(): Observable<DashboardResponse> {
+    return this.http.get<DashboardResponse>(`${this.apiUrl}/dashboard`);
   }
 }
 

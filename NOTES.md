@@ -196,6 +196,10 @@ The PRD's cancel-action language is scoped to confirmed bookings ("Each confirme
 - No optimistic locking / row-level locking on the event or its bookings — two concurrent cancellations for the same event could theoretically both read the same `freeSlots` before either promotion commits, momentarily over-promoting. Not addressed here since the rest of the app has no concurrency control anywhere else either (e.g. `createBooking` has the same race between the occupancy check and the save); consistent with existing scope, but worth flagging if this ever needs to be production-hardened.
 - Still backend-only: no cancel button exists in the UI yet. That's the booking management view (next phase), which is exactly where this endpoint gets its first real caller.
 
+### How it was tested
+- `mvn test`: 10/10 pass (4 pre-existing `EventServiceTest` + 6 new `BookingServiceTest`), run against the H2 in-memory test profile.
+- Frontend untouched this phase — confirmed via `git status` showing only `server-java` files changed.
+
 ---
 
 ## Phase 6: Booking management view
@@ -244,6 +248,41 @@ The 3-lens review (PRD/correctness, Angular/TS quality, UX edge cases) came back
 - `ng build --configuration development`: compiles cleanly, 0 errors/0 warnings.
 - `git status --short` confirmed the diff was exactly the files this phase was expected to touch — `calendar.component.html`/`.scss` untouched, `DataSeeder` untouched.
 
+---
+
+## Phase 7: Daily dashboard
+
+Same implement + 3-lens adversarial review workflow pattern as Phases 4/6. All 3 lenses returned zero findings this time — verified this wasn't a hollow result by reading the workflow's journal directly (each lens's raw tool call really ran and genuinely returned `{"findings": []}`, not an error swallowed into an empty array) and by doing my own read of every changed file before trusting it.
+
+### What was built
+- **Backend:** new `GET /api/dashboard`, backed by a new `DashboardService.getTodayDashboard()` that reuses `EventService.getEventsByDate(LocalDate.now())` (already batches occupancy, already sorted by start time — no new occupancy math written). Returns `DashboardResponse`: `totalEvents`, `totalConfirmedParticipants`, `totalAvailableSeats` (all summed in memory from the `EventResponse` list — no extra queries needed for these three), plus `totalWaitlistedBookings` and a `List<DashboardEventSummary>` (one row per today's event, each carrying its own `waitlistedGuests`).
+- **Frontend:** new `/dashboard` route (`DashboardComponent`) — 4 stat cards, then a clickable list of today's events (title, time, "X / Y booked", availability badge, per-event waitlisted-guest count). Clicking a row navigates to that event's existing `/events/:id/manage` view. A new "Dashboard" button was added to the calendar's header (the one intentional touch to `calendar.component.html`/`.ts` this phase — `.scss` untouched) linking back and forth between the two views.
+
+### Decision: two different waitlist numbers, on purpose
+
+The PRD's wording draws a real distinction that's easy to accidentally erase: "Total confirmed bookings today (**sum of participantCounts**...)" explicitly calls for a guest sum, but "Number of waitlisted **bookings** today" says *bookings*, not guests — read literally as a **row count**. The very next bullet, for the per-event figure, explicitly says "number of waitlisted **guests**" — a guest sum again, but scoped to one event instead of the whole day.
+
+So this phase ships two genuinely different aggregations that happen to both be about "waitlisting":
+- `DashboardResponse.totalWaitlistedBookings` — **count of WAITLISTED booking rows** across all of today's events (new `BookingRepository.countByEventIdInAndStatus`).
+- `DashboardEventSummary.waitlistedGuests` — **sum of `participantCount`** for one event's WAITLISTED bookings (reuses the existing `sumParticipantsByEventIdsAndStatus`, just called with `WAITLISTED` instead of `CONFIRMED` this time).
+
+Two dedicated backend tests lock this in with a contrasting example (two waitlisted bookings of 3 and 5 guests on one event → top-level count is **2**, that event's `waitlistedGuests` is **8**), both DTOs carry a comment warning not to "fix" this into consistency, and the frontend labels the two numbers differently ("Waitlisted bookings today (count)" vs. "Waitlisted guests: N" per row) so a reader can't conflate them either.
+
+### Decision: separate `/dashboard` route, not the landing page
+
+The PRD explicitly allows either ("could be the default landing page or a separate route"). Kept the calendar as `''` and added `/dashboard` alongside it, linked bidirectionally, rather than swapping the app's default landing view — lower-risk (doesn't change what every existing bookmark/link/`?date=` round-trip resolves to) and consistent with how every other phase in this project has preferred additive routes over replacing existing ones.
+
+### Assumptions
+- The dashboard is hardcoded to "today" (`LocalDate.now()`, server-side) with no date parameter, matching the PRD's literal scope for this phase — unlike the calendar, it doesn't support browsing other days. If that's ever wanted, `DashboardService`/`DashboardController` would need a date parameter threaded through, which was deliberately not spec'd here since the PRD frames this as a daily-standup-style snapshot, not a browsable report.
+- Today's event list carries its own `capacity`/`currentBookings`/`availableSeats`/`availabilityStatus` (via `DashboardEventSummary.from(EventResponse, ...)`), reusing `EventResponse`'s existing availability-threshold logic rather than recomputing it — same "single source of truth" reasoning as every prior phase's DTO decisions.
+- No new combined "events + all bookings" query was added for the dashboard; `totalConfirmedParticipants`/`totalAvailableSeats` are cheap in-memory sums over the already-fetched `EventResponse` list (no O(N) additional queries), and only the two waitlist metrics needed new/reused batched aggregate queries.
+
+### Trade-offs / known limitations
+- Same lack of concurrency control as every phase since Phase 5 — not revisited here, consistent with existing scope.
+- No interactive browser testing was possible in this sandboxed environment — validated via `mvn test`, `ng build`, reading every changed file myself, and the adversarial review (which came back clean, and was corroborated by manual reading rather than taken purely on faith). A manual click-through, especially of the two-way Dashboard ↔ Calendar navigation and the dashboard's event-row → management-view drill-down, is still worth doing on a real machine.
+- This closes out all 7 items from the original PRD reading (docs/prd.md's 5 scoped feature sections). Nothing in the PRD's "Out of Scope" list (notifications, guest-facing availability, etc.) was touched, per its own explicit exclusions.
+
 ### How it was tested
-- `mvn test`: 10/10 pass (4 pre-existing `EventServiceTest` + 6 new `BookingServiceTest`), run against the H2 in-memory test profile.
-- Frontend untouched this phase — confirmed via `git status` showing only `server-java` files changed.
+- `mvn test`: 15/15 pass (4 `EventServiceTest` + 8 `BookingServiceTest` + 3 new `DashboardServiceTest`, including the row-count-vs-guest-sum contrast test).
+- `ng build --configuration development`: compiles cleanly, 0 errors/0 warnings.
+- `git status --short` confirmed the diff matched exactly what was expected: new dashboard component + backend files, plus `app.routes.ts`, `event.model.ts`, `event.service.ts`, `BookingRepository.java`, and `calendar.component.ts`/`.html` (not `.scss`).

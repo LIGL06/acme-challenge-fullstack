@@ -70,6 +70,10 @@ export class CalendarComponent implements OnInit {
     this.loadEvents();
   }
 
+  goToDashboard(): void {
+    this.router.navigate(['/dashboard']);
+  }
+
   formatDate(date: Date): string {
     return date.toISOString().split('T')[0];
   }

@@ -24,5 +24,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "WHERE b.event.id IN :eventIds AND b.status = :status GROUP BY b.event.id")
     List<EventOccupancy> sumParticipantsByEventIdsAndStatus(
             @Param("eventIds") List<Long> eventIds, @Param("status") BookingStatus status);
+
+    // Row COUNT of bookings (not a participant sum) for a given status across a set of
+    // event ids. Used for the dashboard's top-level "number of waitlisted bookings today"
+    // metric, which is intentionally a booking count -- contrast with
+    // sumParticipantsByEventIdsAndStatus, which sums participantCount (guests) and is used
+    // for the per-event "waitlisted guests" figures.
+    long countByEventIdInAndStatus(List<Long> eventIds, BookingStatus status);
 }
 

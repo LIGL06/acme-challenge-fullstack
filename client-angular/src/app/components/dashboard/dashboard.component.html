@@ -1,0 +1,51 @@
+<div class="dashboard-container container">
+  <div class="dashboard-header">
+    <h2 class="dashboard-title">Today's Dashboard</h2>
+    <button class="btn btn-secondary" (click)="backToCalendar()">Back to calendar</button>
+  </div>
+
+  <div *ngIf="loading" class="loading">Loading dashboard...</div>
+
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <ng-container *ngIf="!loading && !error && dashboard">
+    <div class="stats-row">
+      <div class="card stat-card">
+        <span class="stat-label">Total events today</span>
+        <span class="stat-value">{{ dashboard.totalEvents }}</span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">Confirmed bookings today (guests)</span>
+        <span class="stat-value">{{ dashboard.totalConfirmedParticipants }}</span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">Available seats remaining today</span>
+        <span class="stat-value">{{ dashboard.totalAvailableSeats }}</span>
+      </div>
+      <div class="card stat-card">
+        <span class="stat-label">Waitlisted bookings today (count)</span>
+        <span class="stat-value">{{ dashboard.totalWaitlistedBookings }}</span>
+      </div>
+    </div>
+
+    <div class="card events-card">
+      <h3>Today's Events</h3>
+
+      <div class="event-row" *ngFor="let event of dashboard.events" (click)="onEventClick(event)">
+        <div class="event-main">
+          <span class="event-title">{{ event.title }}</span>
+          <span class="event-time">{{ event.start | date:'shortTime' }}</span>
+        </div>
+        <div class="event-meta">
+          <span class="occupancy">{{ event.currentBookings }} / {{ event.capacity }} booked</span>
+          <span class="availability-badge" [ngClass]="'badge-' + event.availabilityStatus.toLowerCase()">
+            {{ availabilityLabel(event) }}
+          </span>
+          <span class="waitlisted-guests">Waitlisted guests: {{ event.waitlistedGuests }}</span>
+        </div>
+      </div>
+
+      <p *ngIf="dashboard.totalEvents === 0" class="empty-state">No events scheduled for today.</p>
+    </div>
+  </ng-container>
+</div>
