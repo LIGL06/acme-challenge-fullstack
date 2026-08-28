@@ -1,6 +1,8 @@
 package com.peek.challenge.service;
 
+import com.peek.challenge.dto.CreateBookingRequest;
 import com.peek.challenge.model.Booking;
+import com.peek.challenge.model.BookingStatus;
 import com.peek.challenge.model.Event;
 import com.peek.challenge.repository.BookingRepository;
 import com.peek.challenge.repository.EventRepository;
@@ -28,22 +30,27 @@ public class BookingService {
     }
 
     /**
-     * Creates a booking for a given event.
-     * Candidate TODO: Implement the REST endpoint that calls this method.
+     * Creates a booking for the given event. Confirms it if enough capacity
+     * remains, otherwise places it on the waitlist.
      *
-     * @param eventId   The ID of the event to book
-     * @param firstName Guest's first name
-     * @param lastName  Guest's last name
      * @return The created booking, or empty if the event doesn't exist
      */
     @Transactional
-    public Optional<Booking> createBooking(Long eventId, String firstName, String lastName) {
-        return eventRepository.findById(eventId)
+    public Optional<Booking> createBooking(CreateBookingRequest request) {
+        return eventRepository.findById(request.eventId())
                 .map(event -> {
+                    int confirmedParticipants = bookingRepository
+                            .sumParticipantsByEventIdAndStatus(event.getId(), BookingStatus.CONFIRMED);
+                    boolean fits = confirmedParticipants + request.participantCount() <= event.getCapacity();
+
                     Booking booking = Booking.builder()
                             .event(event)
-                            .firstName(firstName)
-                            .lastName(lastName)
+                            .firstName(request.firstName())
+                            .lastName(request.lastName())
+                            .customerEmail(request.customerEmail())
+                            .participantCount(request.participantCount())
+                            .notes(request.notes())
+                            .status(fits ? BookingStatus.CONFIRMED : BookingStatus.WAITLISTED)
                             .build();
                     return bookingRepository.save(booking);
                 });

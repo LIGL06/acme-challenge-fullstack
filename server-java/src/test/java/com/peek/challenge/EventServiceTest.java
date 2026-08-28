@@ -1,5 +1,6 @@
 package com.peek.challenge;
 
+import com.peek.challenge.dto.EventResponse;
 import com.peek.challenge.model.Event;
 import com.peek.challenge.repository.EventRepository;
 import com.peek.challenge.service.EventService;
@@ -10,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,6 +40,8 @@ class EventServiceTest {
                 .title("Test Event")
                 .start(LocalDateTime.now())
                 .duration(60)
+                .capacity(12)
+                .pricePerPerson(new BigDecimal("45.00"))
                 .build();
 
         Event saved = eventService.createEvent(event);
@@ -53,13 +57,15 @@ class EventServiceTest {
                 .title("Today's Event")
                 .start(today.atTime(10, 0))
                 .duration(60)
+                .capacity(12)
+                .pricePerPerson(new BigDecimal("45.00"))
                 .build();
         eventRepository.save(event);
 
-        List<Event> events = eventService.getEventsByDate(today);
+        List<EventResponse> events = eventService.getEventsByDate(today);
 
         assertThat(events).hasSize(1);
-        assertThat(events.get(0).getTitle()).isEqualTo("Today's Event");
+        assertThat(events.get(0).title()).isEqualTo("Today's Event");
     }
 
     @Test
@@ -68,16 +74,37 @@ class EventServiceTest {
                 .title("Event 1")
                 .start(LocalDateTime.now())
                 .duration(30)
+                .capacity(10)
+                .pricePerPerson(new BigDecimal("30.00"))
                 .build());
         eventRepository.save(Event.builder()
                 .title("Event 2")
                 .start(LocalDateTime.now().plusHours(1))
                 .duration(45)
+                .capacity(20)
+                .pricePerPerson(new BigDecimal("50.00"))
                 .build());
 
-        List<Event> events = eventService.getAllEvents();
+        List<EventResponse> events = eventService.getAllEvents();
 
         assertThat(events).hasSize(2);
+    }
+
+    @Test
+    void shouldReportFullAvailabilityWhenNoBookings() {
+        Event event = eventRepository.save(Event.builder()
+                .title("Empty Event")
+                .start(LocalDateTime.now())
+                .duration(60)
+                .capacity(10)
+                .pricePerPerson(new BigDecimal("40.00"))
+                .build());
+
+        EventResponse response = eventService.getEventById(event.getId()).orElseThrow();
+
+        assertThat(response.currentBookings()).isZero();
+        assertThat(response.availableSeats()).isEqualTo(10);
+        assertThat(response.availabilityStatus().name()).isEqualTo("AVAILABLE");
     }
 }
 

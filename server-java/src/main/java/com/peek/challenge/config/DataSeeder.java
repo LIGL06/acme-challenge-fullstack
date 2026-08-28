@@ -1,6 +1,9 @@
 package com.peek.challenge.config;
 
+import com.peek.challenge.model.Booking;
+import com.peek.challenge.model.BookingStatus;
 import com.peek.challenge.model.Event;
+import com.peek.challenge.repository.BookingRepository;
 import com.peek.challenge.repository.EventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +11,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,6 +32,10 @@ import java.util.List;
 public class DataSeeder implements CommandLineRunner {
 
     private final EventRepository eventRepository;
+    private final BookingRepository bookingRepository;
+
+    private static final int DEFAULT_CAPACITY = 12;
+    private static final BigDecimal DEFAULT_PRICE = new BigDecimal("45.00");
 
     private static final List<LocalTime> EVENT_TIMES = List.of(
             LocalTime.of(10, 0),
@@ -64,6 +72,8 @@ public class DataSeeder implements CommandLineRunner {
                             .title("Wine tour")
                             .start(LocalDateTime.of(eventDate, time))
                             .duration(60)
+                            .capacity(DEFAULT_CAPACITY)
+                            .pricePerPerson(DEFAULT_PRICE)
                             .build();
                     events.add(event);
                 }
@@ -72,6 +82,47 @@ public class DataSeeder implements CommandLineRunner {
 
         eventRepository.saveAll(events);
         log.info("Seeded {} events.", events.size());
+
+        seedSampleBookings(startDate);
+    }
+
+    /**
+     * Seeds a few bookings on today's events so the availability indicator
+     * (available/limited/full) is visible without manually creating bookings.
+     */
+    private void seedSampleBookings(LocalDate startDate) {
+        List<Event> todaysEvents = eventRepository.findByDateRange(
+                startDate.atStartOfDay(), startDate.plusDays(1).atStartOfDay());
+
+        if (todaysEvents.size() < 3) {
+            return;
+        }
+
+        List<Booking> bookings = new ArrayList<>();
+
+        // First event stays untouched -> AVAILABLE (green)
+
+        // Second event: partially booked -> LIMITED (yellow)
+        bookings.add(sampleBooking(todaysEvents.get(1), "Jamie", "Lee", 7, BookingStatus.CONFIRMED));
+
+        // Third event: fully booked, plus one guest on the waitlist -> FULL (red)
+        Event fullEvent = todaysEvents.get(2);
+        bookings.add(sampleBooking(fullEvent, "Sam", "Rivera", fullEvent.getCapacity(), BookingStatus.CONFIRMED));
+        bookings.add(sampleBooking(fullEvent, "Taylor", "Nguyen", 2, BookingStatus.WAITLISTED));
+
+        bookingRepository.saveAll(bookings);
+        log.info("Seeded {} sample bookings.", bookings.size());
+    }
+
+    private Booking sampleBooking(Event event, String firstName, String lastName, int participantCount, BookingStatus status) {
+        return Booking.builder()
+                .event(event)
+                .firstName(firstName)
+                .lastName(lastName)
+                .customerEmail((firstName + "." + lastName + "@example.com").toLowerCase())
+                .participantCount(participantCount)
+                .status(status)
+                .build();
     }
 }
 

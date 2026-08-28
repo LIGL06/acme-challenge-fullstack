@@ -90,6 +90,17 @@ export class CalendarComponent implements OnInit {
     return start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
 
+  availabilityLabel(event: Event): string {
+    switch (event.availabilityStatus) {
+      case 'FULL':
+        return 'Full';
+      case 'LIMITED':
+        return 'Limited';
+      default:
+        return 'Available';
+    }
+  }
+
   // Candidate TODO: Implement onEventClick to show booking form
   onEventClick(event: Event): void {
     console.log('Event clicked:', event);

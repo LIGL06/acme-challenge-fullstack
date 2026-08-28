@@ -1,6 +1,6 @@
 package com.peek.challenge.controller;
 
-import com.peek.challenge.model.Event;
+import com.peek.challenge.dto.EventResponse;
 import com.peek.challenge.service.EventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,19 +19,19 @@ public class EventController {
     private final EventService eventService;
 
     @GetMapping
-    public ResponseEntity<List<Event>> getAllEvents() {
+    public ResponseEntity<List<EventResponse>> getAllEvents() {
         return ResponseEntity.ok(eventService.getAllEvents());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Event> getEventById(@PathVariable Long id) {
+    public ResponseEntity<EventResponse> getEventById(@PathVariable Long id) {
         return eventService.getEventById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/date/{date}")
-    public ResponseEntity<List<Event>> getEventsByDate(
+    public ResponseEntity<List<EventResponse>> getEventsByDate(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(eventService.getEventsByDate(date));
     }

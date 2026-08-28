@@ -2,6 +2,8 @@ package com.peek.challenge.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -36,6 +38,25 @@ public class Booking {
     @JoinColumn(name = "event_id", nullable = false)
     @JsonIgnore
     private Event event;
+
+    @NotNull(message = "Participant count is required")
+    @Min(value = 1, message = "Participant count must be at least 1")
+    @Column(name = "participant_count", nullable = false)
+    private Integer participantCount;
+
+    @NotBlank(message = "Customer email is required")
+    @Email(message = "Customer email must be valid")
+    @Column(name = "customer_email", nullable = false)
+    private String customerEmail;
+
+    @Column(name = "notes")
+    private String notes;
+
+    @NotNull(message = "Status is required")
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private BookingStatus status = BookingStatus.CONFIRMED;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

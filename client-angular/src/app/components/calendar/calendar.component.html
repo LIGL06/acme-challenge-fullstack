@@ -24,6 +24,7 @@
       
       <div
         class="event-block"
+        [ngClass]="'availability-' + event.availabilityStatus.toLowerCase()"
         *ngFor="let event of events"
         [style.top]="getEventPosition(event).top"
         [style.height]="getEventPosition(event).height"
@@ -31,6 +32,12 @@
       >
         <div class="event-title">{{ event.title }}</div>
         <div class="event-time">{{ formatEventTime(event) }} ({{ event.duration }} min)</div>
+        <div class="event-availability">
+          <span class="availability-badge" [ngClass]="'badge-' + event.availabilityStatus.toLowerCase()">
+            {{ availabilityLabel(event) }}
+          </span>
+          <span class="occupancy">{{ event.currentBookings }} / {{ event.capacity }} booked</span>
+        </div>
       </div>
     </div>
   </div>

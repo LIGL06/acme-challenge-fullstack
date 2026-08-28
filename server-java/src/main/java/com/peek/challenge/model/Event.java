@@ -1,6 +1,7 @@
 package com.peek.challenge.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -9,6 +10,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,17 +39,19 @@ public class Event {
     @Column(nullable = false)
     private Integer duration; // in minutes
 
+    @NotNull(message = "Capacity is required")
+    @Positive(message = "Capacity must be a positive integer")
+    @Column(nullable = false)
+    private Integer capacity;
+
+    @NotNull(message = "Price per person is required")
+    @DecimalMin(value = "0.0", message = "Price per person must not be negative")
+    @Column(name = "price_per_person", nullable = false, precision = 10, scale = 2)
+    private BigDecimal pricePerPerson;
+
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
-
-    /**
-     * Returns the number of bookings for this event.
-     * Useful for displaying booking count in the calendar view.
-     */
-    public int getBookingCount() {
-        return bookings.size();
-    }
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

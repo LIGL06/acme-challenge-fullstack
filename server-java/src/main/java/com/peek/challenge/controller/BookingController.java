@@ -1,8 +1,12 @@
 package com.peek.challenge.controller;
 
+import com.peek.challenge.dto.BookingResponse;
+import com.peek.challenge.dto.CreateBookingRequest;
 import com.peek.challenge.model.Booking;
 import com.peek.challenge.service.BookingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,8 +25,11 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookingsByEventId(eventId));
     }
 
-    // Candidate TODO: Implement POST endpoint to create a booking
-    // The BookingService.createBooking method is already implemented and ready to use.
-    // Create a DTO for the request body and wire up the endpoint.
+    @PostMapping
+    public ResponseEntity<BookingResponse> createBooking(@Valid @RequestBody CreateBookingRequest request) {
+        return bookingService.createBooking(request)
+                .map(booking -> ResponseEntity.status(HttpStatus.CREATED).body(BookingResponse.from(booking)))
+                .orElse(ResponseEntity.notFound().build());
+    }
 }
 

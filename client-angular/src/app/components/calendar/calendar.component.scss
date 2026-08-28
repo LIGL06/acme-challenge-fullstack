@@ -78,9 +78,22 @@
   cursor: pointer;
   overflow: hidden;
   transition: background-color 0.2s;
+  border-left: 4px solid transparent;
 
   &:hover {
     background: #2563eb;
+  }
+
+  &.availability-available {
+    border-left-color: #16a34a;
+  }
+
+  &.availability-limited {
+    border-left-color: #f59e0b;
+  }
+
+  &.availability-full {
+    border-left-color: #dc2626;
   }
 }
 
@@ -95,6 +108,41 @@
 .event-time {
   font-size: 0.75rem;
   opacity: 0.9;
+}
+
+.event-availability {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.occupancy {
+  opacity: 0.9;
+}
+
+.availability-badge {
+  display: inline-block;
+  padding: 0.0625rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+
+  &.badge-available {
+    background: #16a34a;
+  }
+
+  &.badge-limited {
+    background: #f59e0b;
+    color: #1f2937;
+  }
+
+  &.badge-full {
+    background: #dc2626;
+  }
 }
 
 .loading, .error, .no-events {
