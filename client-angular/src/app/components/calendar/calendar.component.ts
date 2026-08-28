@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router, ActivatedRoute } from '@angular/router';
 import { EventService } from '../../services/event.service';
 import { Event } from '../../models/event.model';
 
@@ -19,9 +20,20 @@ export class CalendarComponent implements OnInit {
   // Hours to display in the calendar (8 AM to 8 PM)
   hours: number[] = Array.from({ length: 13 }, (_, i) => i + 8);
 
-  constructor(private eventService: EventService) {}
+  constructor(
+    private eventService: EventService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit(): void {
+    const dateParam = this.route.snapshot.queryParamMap.get('date');
+    if (dateParam) {
+      const parsed = new Date(dateParam + 'T00:00:00');
+      if (!isNaN(parsed.getTime())) {
+        this.selectedDate = parsed;
+      }
+    }
     this.loadEvents();
   }
 
@@ -101,10 +113,10 @@ export class CalendarComponent implements OnInit {
     }
   }
 
-  // Candidate TODO: Implement onEventClick to show booking form
   onEventClick(event: Event): void {
-    console.log('Event clicked:', event);
-    // TODO: Open a dialog/modal to create a booking for this event
+    this.router.navigate(['/events', event.id, 'book'], {
+      queryParams: { date: this.formatDate(this.selectedDate) }
+    });
   }
 }
 

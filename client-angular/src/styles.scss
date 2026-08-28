@@ -46,6 +46,11 @@ body {
       background-color: #d1d5db;
     }
   }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .card {

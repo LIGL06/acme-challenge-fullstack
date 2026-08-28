@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Event, Booking, CreateBookingRequest } from '../models/event.model';
+import { Event, Booking, CreateBookingRequest, BookingResponse } from '../models/event.model';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -28,7 +28,8 @@ export class EventService {
     return this.http.get<Booking[]>(`${this.apiUrl}/bookings/event/${eventId}`);
   }
 
-  // Candidate TODO: Implement createBooking method
-  // This should POST to the booking endpoint once it's implemented on the server
+  createBooking(request: CreateBookingRequest): Observable<BookingResponse> {
+    return this.http.post<BookingResponse>(`${this.apiUrl}/bookings`, request);
+  }
 }
 

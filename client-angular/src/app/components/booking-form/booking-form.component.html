@@ -1,0 +1,88 @@
+<div class="card booking-form-card">
+  <div *ngIf="loadingEvent">Loading event…</div>
+
+  <ng-container *ngIf="loadError">
+    <div class="error">{{ loadError }}</div>
+    <button class="btn btn-secondary" (click)="backToCalendar()">Back to calendar</button>
+  </ng-container>
+
+  <ng-container *ngIf="event && !loadingEvent">
+    <div class="event-summary">
+      <h2>{{ event.title }}</h2>
+      <p class="event-datetime">
+        {{ event.start | date:'EEEE, MMMM d, y' }} at {{ event.start | date:'shortTime' }} ({{ event.duration }} min)
+      </p>
+      <p class="event-price">{{ event.pricePerPerson | currency }} / person</p>
+      <p class="event-availability">
+        <span class="availability-badge" [ngClass]="'badge-' + event.availabilityStatus.toLowerCase()">
+          {{ event.availabilityStatus === 'FULL' ? 'Full' : event.availabilityStatus === 'LIMITED' ? 'Limited' : 'Available' }}
+        </span>
+        <span>{{ event.availableSeats }} seat{{ event.availableSeats === 1 ? '' : 's' }} available ({{ event.currentBookings }} / {{ event.capacity }} booked)</span>
+      </p>
+    </div>
+
+    <form *ngIf="!result" novalidate [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-row">
+        <label for="firstName">First name</label>
+        <input id="firstName" type="text" formControlName="firstName" />
+        <div class="field-error" *ngIf="form.controls.firstName.touched && form.controls.firstName.invalid">
+          First name is required.
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="lastName">Last name</label>
+        <input id="lastName" type="text" formControlName="lastName" />
+        <div class="field-error" *ngIf="form.controls.lastName.touched && form.controls.lastName.invalid">
+          Last name is required.
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="customerEmail">Email</label>
+        <input id="customerEmail" type="email" formControlName="customerEmail" />
+        <div class="field-error" *ngIf="form.controls.customerEmail.touched && form.controls.customerEmail.errors?.['required']">
+          Email is required.
+        </div>
+        <div class="field-error" *ngIf="form.controls.customerEmail.touched && form.controls.customerEmail.errors?.['email']">
+          Enter a valid email address.
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="participantCount">Participant count</label>
+        <input id="participantCount" type="number" min="1" step="1" formControlName="participantCount" />
+        <div class="field-error" *ngIf="form.controls.participantCount.touched && form.controls.participantCount.errors?.['required']">
+          Participant count is required.
+        </div>
+        <div class="field-error" *ngIf="form.controls.participantCount.touched && form.controls.participantCount.errors?.['min']">
+          At least 1 participant is required.
+        </div>
+        <div class="field-error" *ngIf="form.controls.participantCount.touched && form.controls.participantCount.errors?.['integer']">
+          Participant count must be a whole number.
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="notes">Notes</label>
+        <textarea id="notes" formControlName="notes"></textarea>
+      </div>
+
+      <div class="alert-error" *ngIf="submitError">{{ submitError }}</div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" [disabled]="submitting">{{ submitting ? 'Booking…' : 'Create Booking' }}</button>
+        <button class="btn btn-secondary" type="button" (click)="cancel()" [disabled]="submitting">Cancel</button>
+      </div>
+    </form>
+
+    <div *ngIf="result" class="result-panel" [ngClass]="'status-' + result.status.toLowerCase()">
+      <h3>
+        {{ result.status === 'CONFIRMED' ? 'Booking Confirmed' : result.status === 'WAITLISTED' ? 'Added to Waitlist' : 'Booking Result' }}
+      </h3>
+      <p>{{ result.message }}</p>
+      <p class="result-recap">{{ result.firstName }} {{ result.lastName }} — {{ result.participantCount }} participant(s) — {{ event.title }}</p>
+      <button class="btn btn-primary" (click)="backToCalendar()">Back to calendar</button>
+    </div>
+  </ng-container>
+</div>

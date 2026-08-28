@@ -25,6 +25,7 @@ Difficulty read, easiest/most-foundational → hardest
 
 
 *First Decision After first run of Phase 1-3*:
+- Will run Sonnet 5 with ultracode effort for first run, since time is the blocker here, will do a scrub with Opus 5 for final analysis. 
 - The local Postgres 'peek_challenge' DB already has 300 seeded events (0 real bookings) from a prior schema, without the new capacity/pricePerPerson columns. Starting the server with NOT NULL columns added via Hibernate's ddl-auto=update will fail against those existing rows.
     - Choices can be:
     1. to Drop & reseed with new schema (capacity, pricePerPerson, sample bookings). Since all current data is just disposable seed fixtures.
@@ -86,3 +87,63 @@ Difficulty read, easiest/most-foundational → hardest
 - `ng build`: compiles cleanly with the updated models and template bindings.
 - Manual end-to-end check against local Postgres with seeded data (via curl): confirmed `AVAILABLE`/`LIMITED`/`FULL` compute correctly for the three seeded states; `POST /api/bookings` returns `CONFIRMED` when capacity allows and `WAITLISTED` (with a clear `message`) when it doesn't; malformed requests return `400`.
 - Could not capture an actual browser screenshot in this sandboxed environment (no display available) — relied on API-level verification plus a clean Angular build instead of a visual check.
+
+---
+
+## Phase 4: Angular booking form UI
+
+For this phase I used multi-agent orchestration (design proposals → judge → implement → adversarial review) rather than implementing solo, since the user had just turned on a mode that biases toward this for substantive work. Documenting the *process* here too, since it materially shaped the decisions below.
+
+### Process
+1. **Design** — 3 agents independently proposed a UX approach for "click an event → book it": (a) a dedicated route `/events/:id/book`, (b) a hand-rolled modal overlay, (c) a docked side/bottom panel. Two of the three (modal, docked-panel) failed on the first run with a transient "connection lost mid-response" infra error, so the first judging pass only had 1 proposal to evaluate (it still produced a well-reasoned, codebase-grounded spec, but the comparison wasn't real).
+2. **Implement** — built exactly to the single-proposal spec: `EventService.createBooking()`, a new route + standalone `BookingFormComponent`, `CalendarComponent.onEventClick` wired to navigate there. Verified with its own `ng build` run before returning.
+3. **Verify** — 3 agents reviewed the diff through different lenses (PRD/correctness, Angular/TypeScript quality, UX edge cases) and surfaced 8 findings (see below).
+4. **Retry** — per explicit instruction, retried the 2 failed design agents with the identical prompts. Both succeeded this time, giving a genuine 3-proposal set.
+5. **Rejudge** — re-ran the judge with all 3 proposals *and* full knowledge that the dedicated-route approach was already implemented, built, and reviewed. Instructed to bias toward keeping the existing implementation unless an alternative was "clearly and substantially better," since discarding working, verified code has a real cost. Verdict: **KEEP_EXISTING**.
+
+### Decision: dedicated route (`/events/:id/book`) over modal or docked panel
+
+**Why kept over the modal overlay:**
+- No Angular Material/CDK is installed in this project, so a modal means hand-rolling a focus trap, Escape-key handling, backdrop-click handling, and body-scroll locking. The modal proposal's own submitted pros/cons admitted its focus trap "is necessarily simple... not as robust as a library-provided dialog" — real accessibility risk for a rewrite the PRD doesn't actually require (the PRD says "opens (or navigates to)," so either satisfies it).
+- The route approach gets the exact same outcome (calendar refreshes on return) for free from the router's destroy/recreate lifecycle — no event-emitter/refresh-service plumbing needed either way, so the modal's main structural argument (avoiding plumbing) doesn't hold up once you actually compare the two.
+
+**Why kept over the docked side/bottom panel:**
+- Requires restructuring `CalendarComponent`'s template into a two-region flex layout and adding `ngOnChanges`-based state-reset logic for the "switch between two open events without closing first" case — the panel proposal's own cons list flagged this as "an easy detail to forget/get wrong." That's added surface area in a component that already works, for a UX preference rather than a defect fix.
+
+**Pros of the route approach:**
+- Bookmarkable/shareable URL; browser back/forward works for free.
+- Router's natural destroy/recreate on navigation-back means the calendar's occupancy badges refresh with zero extra wiring.
+- Smallest, most contained diff: one service method, one route entry, one new component, a 2-line change to `onEventClick`, `calendar.component.html`/`.scss` untouched entirely.
+
+**Cons / accepted trade-offs:**
+- Not deep-linkable to "come back to this exact booking mid-fill" (fresh navigation always starts the form blank) — acceptable, no PRD requirement for draft persistence.
+- Loses the calendar's `selectedDate` on a naive round trip — **mitigated**: `onEventClick` passes the current date as a `?date=` query param, and `CalendarComponent.ngOnInit` restores `selectedDate` from it (falling back to today if absent/invalid) before loading events.
+- A full route transition is heavier than a modal for back-to-back bookings on the same event. Accepted as a minor UX cost given the accessibility/complexity trade-off above; not a blocker for this phase's scope.
+
+### Verify findings and how they were resolved
+All 8 findings from the 3-lens review were low/medium severity, non-structural (consistent with the rejudge's read of the situation). Applied directly rather than delegating further:
+
+| Finding | Severity | Fix |
+|---|---|---|
+| First/last name accepted whitespace-only input (backend has `@NotBlank`) | low | Added a `notBlankValidator()` alongside `Validators.required` |
+| `participantCount` accepted fractional values (backend field is `Integer`) | low (reported by 2/3 reviewers) | Added an `integerValidator()` alongside `min(1)` |
+| `<form>` missing `novalidate`, letting native HTML5 validation race with Reactive Forms | medium | Added `novalidate` |
+| Route id/date read once via `route.snapshot` instead of subscribing — stale data if the component instance were ever reused for a different event id | low (reported by 2/3 reviewers) | Switched to `route.paramMap.subscribe(...)`, resetting `event`/`result`/`submitError`/`loadError`/form state on each emission. Not reachable via the shipped calendar→form entry point today (different route configs, so Angular doesn't reuse the instance), but cheap to fix correctly and removes a latent trap for any future direct booking-form-to-booking-form link. |
+| `event?.title` in the result panel produced an NG8107 "unnecessary optional chaining" build warning (already narrowed non-null by the ancestor `*ngIf`) | low | Changed to `event.title` |
+| No visible affordance while a booking is submitting (button label unchanged, no disabled styling) | medium | Button label switches to "Booking…" while `submitting`; added a global `.btn:disabled { opacity: 0.6; cursor: not-allowed; }` to `styles.scss` (benefits the Cancel/nav buttons too, not just this form) |
+
+### Assumptions
+- Kept the booking form's error messages generic per HTTP status (400/404/other) rather than trying to parse and surface the backend's raw Spring validation error body, since that endpoint doesn't return a custom error DTO (see Phase 1 notes) — parsing it would mean coupling the client to an unstable, framework-default error shape.
+- Guest name (`firstName`/`lastName`) validation only enforces "not required + not blank," matching the backend; no additional format/length rules were invented client-side.
+- The booking form intentionally does **not** block or warn when `event.availableSeats` is 0 — submitting into a full event must still succeed and land as `WAITLISTED` per the PRD, so no client-side pre-check against capacity was added anywhere.
+
+### Trade-offs / known limitations (would revisit with more time)
+- No interactive browser testing was possible in this sandboxed environment (no display) — validated via `ng build`, static review, and reasoning through the `?date=` round-trip logic by hand, not by actually clicking through it in a browser. Worth a manual spot-check on a real machine.
+- The stale-route-param fix (subscribing instead of snapshot) hardens a currently-unreachable path; if a "book again" or direct booking-to-booking link is ever added, re-verify this still behaves correctly since it wasn't exercised by any real navigation in this pass.
+- `GET /api/bookings/event/{id}` (pre-existing, not touched this phase) still returns raw `Booking` entities rather than a DTO — still on the list to unify whenever the booking management view (next phase) is built.
+
+### How it was tested
+- `mvn test`: all 4 tests still pass (backend untouched this phase).
+- `ng build`: compiles cleanly, zero errors/warnings, after all fixes were applied.
+- Verified both `http://localhost:4200/` and `http://localhost:4200/events/13/book` serve correctly via curl, and that `GET /api/events/13` still reflects live occupancy — confirms the client/server wiring is intact end-to-end.
+- As in Phase 1, no real browser/click-through testing was possible (no display in this sandbox) — this is the main gap to close with a manual pass.
