@@ -286,3 +286,16 @@ The PRD explicitly allows either ("could be the default landing page or a separa
 - `mvn test`: 15/15 pass (4 `EventServiceTest` + 8 `BookingServiceTest` + 3 new `DashboardServiceTest`, including the row-count-vs-guest-sum contrast test).
 - `ng build --configuration development`: compiles cleanly, 0 errors/0 warnings.
 - `git status --short` confirmed the diff matched exactly what was expected: new dashboard component + backend files, plus `app.routes.ts`, `event.model.ts`, `event.service.ts`, `BookingRepository.java`, and `calendar.component.ts`/`.html` (not `.scss`).
+
+### AUDIT
+- All notes found by Opus 5 for an audit with features/bugs is found in the docs/future-plan.md
+
+### COST
+- Total cost:            $48.54
+- Total duration (API):  3h 8m 32s
+- Total duration (wall): 3h 3m 40s
+- Total code changes:    3292 lines added, 174 lines removed
+- Usage by model:
+   - claude-haiku-4-5:  936 input, 24 output, 0 cache read, 0 cache write ($0.0011)
+   - claude-sonnet-5:  7.9k input, 468.1k output, 46.8m cache read, 2.3m cache write ($19.74)
+   - claude-opus-5:  550 input, 410.4k output, 18.5m cache read, 1.5m cache write ($28.80)
