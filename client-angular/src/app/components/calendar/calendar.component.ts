@@ -97,11 +97,6 @@ export class CalendarComponent implements OnInit {
     return { top: `${top}px`, height: `${height}px` };
   }
 
-  formatEventTime(event: Event): string {
-    const start = new Date(event.start);
-    return start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  }
-
   availabilityLabel(event: Event): string {
     switch (event.availabilityStatus) {
       case 'FULL':
